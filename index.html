@@ -2047,6 +2047,11 @@
                     <h3>抛硬币</h3>
                     <p>是 / 否 二元选择</p>
                 </div>
+                <button type="button" class="decision-option-card" id="open-chat-quiz">
+                    <i class="fas fa-list-ul" aria-hidden="true"></i>
+                    <h3>出选择题</h3>
+                    <p>让对方随机选一项</p>
+                </button>
                 <div class="decision-option-card" id="open-wheel">
                     <i class="fas fa-magic"></i>
                     <h3>随机抽签</h3>
@@ -2059,6 +2064,23 @@
         </div>
     </div>
     
+    <div class="modal" id="chat-quiz-modal" role="dialog" aria-labelledby="chat-quiz-title">
+        <form class="modal-content" id="chat-quiz-form">
+            <div class="modal-title" id="chat-quiz-title">出选择题</div>
+            <div style="display:grid;gap:8px">
+                <label>题目 <input name="question" required maxlength="200"></label>
+                <label>A <input name="option" required maxlength="80"></label>
+                <label>B <input name="option" required maxlength="80"></label>
+                <label>C <input name="option" maxlength="80" placeholder="可留空"></label>
+                <label>D <input name="option" maxlength="80" placeholder="可留空"></label>
+            </div>
+            <div class="modal-buttons">
+                <button type="button" class="modal-btn modal-btn-secondary" id="cancel-chat-quiz">取消</button>
+                <button type="submit" class="modal-btn modal-btn-primary">发送</button>
+            </div>
+        </form>
+    </div>
+
     <div class="modal" id="wheel-modal">
         <div class="modal-content">
             <div class="modal-title">
@@ -2236,6 +2258,57 @@
     <script src="js/data.js"></script>
     <script src="js/onboarding.js"></script> 
     <script src="js/listeners.js"></script>
+    <script>
+    (() => {
+        const menu = document.getElementById('decision-menu-modal');
+        const modal = document.getElementById('chat-quiz-modal');
+        const form = document.getElementById('chat-quiz-form');
+        const questionInput = form.elements.namedItem('question');
+        const optionInputs = Array.from(form.querySelectorAll('[name="option"]'));
+
+        document.getElementById('open-chat-quiz').addEventListener('click', () => {
+            hideModal(menu);
+            showModal(modal);
+            questionInput.focus();
+        });
+        document.getElementById('cancel-chat-quiz').addEventListener('click', () => hideModal(modal));
+
+        // Normal chat messages are rendered as HTML by the existing chat renderer.
+        const escapeText = text => text.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+        form.addEventListener('submit', event => {
+            event.preventDefault();
+            const question = questionInput.value.trim();
+            const options = optionInputs.flatMap((input, index) => {
+                const value = input.value.trim();
+                return value ? [String.fromCharCode(65 + index) + '. ' + escapeText(value)] : [];
+            });
+            if (!question || options.length < 2) {
+                showNotification('请输入题目和至少两个选项', 'error');
+                return;
+            }
+
+            const answer = options[Math.floor(Math.random() * options.length)];
+            const timestamp = new Date();
+            const usedIds = new Set(messages.map(message => String(message.id)));
+            let id = timestamp.getTime();
+            while (usedIds.has(String(id)) || usedIds.has(String(id + 1))) id += 1;
+
+            const message = { timestamp, image: null, favorited: false, note: null, type: 'normal' };
+            addMessage({
+                ...message, id, sender: 'user', status: 'read',
+                text: '【选择题】' + escapeText(question) + '\n' + options.join('\n')
+            });
+            addMessage({
+                ...message, id: id + 1, sender: settings.partnerName || '对方',
+                text: '我选 ' + answer
+            });
+            form.reset();
+            hideModal(modal);
+        });
+    })();
+    </script>
     <script src="js/app.js"></script>
 </body>
 </html>
